@@ -1183,3 +1183,58 @@ export function convertCommonJsToGoogModule(
   let file = ts.createSourceFile(fileName, content, ts.ScriptTarget.ES5, true);
   return new PostProcessor(file, pathToModuleName).process();
 }
+
+export class Extension {
+  public options: any;
+  /** externs.js files produced by sickle, if any. */
+  private externs: {[fileName: string]: string} = {};
+
+  preProcess(program: ts.Program, file: ts.SourceFile):
+      {content: string; diagnostics: ts.Diagnostic[];} {
+    const result = annotate(program, file, this.options);
+    if (result.externs) {
+      this.externs[file.fileName] = result.externs;
+    }
+    return {content: result.output, diagnostics: result.diagnostics};
+  }
+  postProcess(fileName: string, content: string): string {
+    return convertCommonJsToGoogModule(fileName, content, this.pathToModuleName).output;
+  };
+
+  /**
+   * Massages file names into valid goog.module names:
+   * - resolves relative paths to the given context
+   * - replace resolved module path with module name
+   * - replaces '/' with '$' to have a flat name.
+   * - replace first char if non-alpha
+   * - replace subsequent non-alpha numeric chars
+   */
+  pathToModuleName(context: string, importPath: string): string {
+    // Replace characters not supported by goog.module.
+    let moduleName = importPath.replace(/\//g, '$')
+                         .replace(/_/g, '__')
+                         .replace(/^[^a-zA-Z_$]/, '_')
+                         .replace(/[^a-zA-Z_0-9._$]/g, '_');
+    return moduleName;
+  }
+
+  /** Concatenate all generated externs definitions together into a string. */
+  getGeneratedExterns(): string {
+    let allExterns = '';
+    for (let fileName of Object.keys(this.externs)) {
+      allExterns += `// externs from ${fileName}:\n`;
+      allExterns += this.externs[fileName];
+    }
+    if (allExterns) {
+      return '/** @externs */\n' + allExterns;
+    }
+    return '';
+  }
+
+  codegen(writeFile: (filePath: string, content: string) => void): void {
+    let externs = this.getGeneratedExterns();
+    writeFile('externs.js', externs);
+  }
+}
+const extension = new Extension();
+export default extension;
