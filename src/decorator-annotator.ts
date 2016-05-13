@@ -133,7 +133,7 @@ class ClassRewriter extends Rewriter {
    */
   private emitMetadata() {
     if (this.decorators) {
-      this.emit(`static decorators: DecoratorInvocation[] = [\n`);
+      this.emit(`/** @nocollapse */ static decorators: DecoratorInvocation[] = [\n`);
       for (let annotation of this.decorators) {
         this.emitDecorator(annotation);
         this.emit(',\n');
@@ -143,7 +143,7 @@ class ClassRewriter extends Rewriter {
 
     if (this.ctorParameters) {
       this.emit(
-          `static ctorParameters: {type: Function, decorators?: DecoratorInvocation[]}[] = [\n`);
+          `/** @nocollapse */ static ctorParameters: {type: Function, decorators?: DecoratorInvocation[]}[] = [\n`);
       for (let param of this.ctorParameters) {
         if (!param) {
           this.emit('null,\n');
@@ -165,7 +165,7 @@ class ClassRewriter extends Rewriter {
     }
 
     if (this.propDecorators) {
-      this.emit('static propDecorators: {[key: string]: DecoratorInvocation[]} = {\n');
+      this.emit('/** @nocollapse */ static propDecorators: {[key: string]: DecoratorInvocation[]} = {\n');
       for (let name of Object.keys(this.propDecorators)) {
         this.emit(`'${name}': [`);
         for (let decorator of this.propDecorators[name]) {

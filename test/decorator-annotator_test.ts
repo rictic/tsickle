@@ -158,6 +158,7 @@ class Foo {
 class Foo {
   constructor( bar: AbstractService, num: number) {
   }
+/** @nocollapse */
 static ctorParameters: {type: Function, decorators?: DecoratorInvocation[]}[] = [
 {type: AbstractService, decorators: [{ type: Inject }, ]},
 null,
