@@ -97,10 +97,12 @@ export function getJSDocAnnotation(comment: string): JSDocComment {
     if (match) {
       let [_, tagName, text] = match;
       if (tagName === 'type') {
-        throw new Error('@type annotations are not allowed');
+        //throw new Error('@type annotations are not allowed');
+        continue;
       }
       if ((tagName === 'param' || tagName === 'return') && text[0] === '{') {
-        throw new Error('type annotations (using {...}) are not allowed');
+        //throw new Error('type annotations (using {...}) are not allowed');
+        continue;
       }
 
       // Grab the parameter name from @param tags.
@@ -570,7 +572,7 @@ class Annotator extends Rewriter {
         }
         break;
       default:
-        this.errorUnimplementedKind(node, 'externs generation');
+        this.emit(`\n/* TODO: ${ts.SyntaxKind[node.kind]} in ${namespace.join('.')} */\n`);
         break;
     }
     this.output = originalOutput;
@@ -624,7 +626,11 @@ class Annotator extends Rewriter {
           //   interface Foo { [key: string]: number; }
           // For now, just die unless all the members are regular old
           // properties.
-          this.errorUnimplementedKind(member, 'externs for interface');
+          let name = namespace;
+          if (member.name) {
+            name = name.concat([member.name.getText()]);
+          }
+          this.emit(`\n/* TODO: ${ts.SyntaxKind[member.kind]} in ${name.join('.')} */\n`);
       }
     }
   }
