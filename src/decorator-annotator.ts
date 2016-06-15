@@ -16,11 +16,38 @@ class ClassRewriter extends Rewriter {
   constructor(private typeChecker: ts.TypeChecker, sourceFile: ts.SourceFile) { super(sourceFile); }
 
   /**
+   * Should the given decorator node be re-written as an annotation?
+   */
+  shouldLower(decorator: ts.Decorator) {
+    // Walk down the expression to find the identifier of the decorator function
+    let node: ts.Node = decorator;
+    while (node.kind !== ts.SyntaxKind.Identifier) {
+      switch(node.kind) {
+        case ts.SyntaxKind.Decorator:
+          node = (node as ts.Decorator).expression;
+          break;
+        case ts.SyntaxKind.CallExpression:
+          node = (node as ts.CallExpression).expression;
+          break;
+        default:
+          throw new Error("Cannot understand Decorator node" + JSON.stringify(node));
+      }
+    }
+
+    let decSym = this.typeChecker.getSymbolAtLocation(node);
+    if (decSym.flags & ts.SymbolFlags.Alias) {
+      decSym = this.typeChecker.getAliasedSymbol(decSym);
+    }
+    return decSym.getDocumentationComment().some(c => c.text.indexOf("@Annotation") >= 0);
+  }
+
+  /**
    * process is the main entry point, rewriting a single class node.
    */
   process(node: ts.ClassDeclaration): {output: string, diagnostics: ts.Diagnostic[]} {
     if (node.decorators) {
-      this.decorators = node.decorators.slice();
+      let toLower = node.decorators.filter(this.shouldLower.bind(this));
+      if (toLower.length > 0) this.decorators = toLower;
     }
     let pos = node.getFullStart();
     for (let child of node.getChildren()) {
@@ -51,8 +78,8 @@ class ClassRewriter extends Rewriter {
       let paramCtor: string;
       let decorators: ts.Decorator[];
       if (param.decorators) {
-        decorators = param.decorators.slice();
-        hasDecoratedParam = true;
+        decorators = param.decorators.filter(this.shouldLower.bind(this));
+        hasDecoratedParam = decorators.length > 0;
       }
       if (param.type) {
         // param has a type provided, e.g. "foo: Bar".
@@ -88,7 +115,8 @@ class ClassRewriter extends Rewriter {
     }
 
     let name = (method.name as ts.Identifier).text;
-    let decorators: ts.Decorator[] = method.decorators.slice();
+    let decorators: ts.Decorator[] = method.decorators.filter(this.shouldLower.bind(this));
+    if (decorators.length == 0) return;
     if (!this.propDecorators) this.propDecorators = {};
     this.propDecorators[name] = decorators;
   }
@@ -117,8 +145,7 @@ class ClassRewriter extends Rewriter {
         this.gatherMethodOrProperty(node as ts.Declaration);
         return false;  // Proceed with ordinary emit of the method.
       case ts.SyntaxKind.Decorator:
-        // Skip emit of all decorators, as they are specially handled.
-        return true;
+        return this.shouldLower(node as ts.Decorator);
       default:
         return false;
     }
