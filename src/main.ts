@@ -20,6 +20,13 @@ interface Settings {
 
   /** If true, log internal debug warnings to the console. */
   verbose?: boolean;
+
+  /**
+   * If false, convert ES2015 imports to goog.module and goog.require.
+   * If true, imports are left alone, and we obey the `module` typescript
+   * compiler option.
+   */
+  nativeModules: boolean;
 }
 
 function usage() {
@@ -39,7 +46,7 @@ tsickle flags are:
  * the arguments to pass on to tsc.
  */
 function loadSettingsFromArgs(args: string[]): {settings: Settings, tscArgs: string[]} {
-  let settings: Settings = {isUntyped: false};
+  let settings: Settings = {isUntyped: false, nativeModules: false};
   let parsedArgs = minimist(args);
   for (let flag of Object.keys(parsedArgs)) {
     switch (flag) {
@@ -56,6 +63,9 @@ function loadSettingsFromArgs(args: string[]): {settings: Settings, tscArgs: str
         break;
       case 'verbose':
         settings.verbose = true;
+        break;
+      case 'nativeModules':
+        settings.nativeModules = true;
         break;
       case '_':
         // This is part of the minimist API, and holds args after the '--'.
@@ -213,11 +223,13 @@ function toClosureJS(
     return null;
   }
 
-  for (let fileName of toArray(jsFiles.keys())) {
-    if (path.extname(fileName) !== '.map') {
-      let {output} = tsickle.convertCommonJsToGoogModule(
-          fileName, jsFiles.get(fileName)!, cliSupport.pathToModuleName);
-      jsFiles.set(fileName, output);
+  if (!settings.nativeModules) {
+    for (let fileName of toArray(jsFiles.keys())) {
+      if (path.extname(fileName) !== '.map') {
+        let {output} = tsickle.convertCommonJsToGoogModule(
+            fileName, jsFiles.get(fileName)!, cliSupport.pathToModuleName);
+        jsFiles.set(fileName, output);
+      }
     }
   }
 
